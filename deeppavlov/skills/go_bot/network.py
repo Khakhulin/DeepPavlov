@@ -153,16 +153,16 @@ class GoalOrientedBotNetwork(TFModel):
         self.state_h = np.zeros([1, self.n_hidden], dtype=np.float32)
 
     def _train_step(self, features, action, action_mask):
-        _, loss_value, prediction = \
+        _, loss_value = \
             self.sess.run(
-                [ self._train_op, self._loss, self._prediction ],
+                [ self._train_op, self._loss ],
                 feed_dict={
                     self._features: [features],
                     self._action: [action],
                     self._action_mask: [action_mask]
                 }
             )
-        return loss_value, prediction
+        return loss_value
 
     def _forward(self, features, action_mask, prob=False):
         probs, prediction, state = \

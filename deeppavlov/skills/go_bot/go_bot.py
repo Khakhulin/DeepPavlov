@@ -81,9 +81,6 @@ class GoalOrientedBot(Inferable, Trainable):
             self.n_intents = self.intent_classifier.n_classes
         self.prev_action = np.zeros(self.n_actions, dtype=np.float32)
 
-        # initialize metrics
-        self.metrics = DialogMetrics(self.n_actions)
-
         # opt = {
         #    'action_size': self.n_actions,
         #    'obs_size': 4 + len(self.word_vocab) + self.embedder.dim +\
@@ -182,16 +179,11 @@ class GoalOrientedBot(Inferable, Trainable):
         # TODO: in case val_patience is off, save model {val_patience} steps before
         for j in range(self.num_epochs):
 
-            tr_data = data.batch_generator(1, 'train', shuffle=False)
-            eval_data = data.iter_all('valid')
-            #eval_data = data.batch_generator(1, 'valid')
+            train_dialogs = data.batch_generator(1, 'train', shuffle=False)
 
-            self.reset_metrics()
-
-            for dialog in tr_data:
+            for dialog in train_dialogs:
 
                 self.reset()
-                self.metrics.n_dialogs += 1
                 d_features, d_actions, d_masks = [], [], []
 
                 for context, response in dialog:
@@ -210,30 +202,10 @@ class GoalOrientedBot(Inferable, Trainable):
 
                     d_masks.append(self._action_mask())
 
-                loss, d_preds = self.network.train(d_features, d_actions, d_masks)
-
-                for pred_id, action_id in zip(d_preds, d_actions):
-                    pred = ""
-                    # TODO: decoding is using wrong state
-                    #self._decode_response(pred_id).lower()
-                    true = self.tokenizer.infer(response['text'].lower().split())
-
-                    # update metrics
-                    self.metrics.n_examples += 1
-                    self.metrics.train_loss += loss
-                    self.metrics.conf_matrix[pred_id, action_id] += 1
-                    #self.metrics.n_corr_examples += int(pred == true)
-                    if self.debug and ((pred == true) != (pred_id == action_id)):
-                        print("Slot filling problem: ")
-                        print("Pred = {}: {}".format(pred_id, pred))
-                        print("True = {}: {}".format(action_id, true))
-                        #print("State =", self.tracker.get_state())
-                        #print("db_result =", self.db_result)
-                        # TODO: update dialog metrics
+                loss = self.network.train(d_features, d_actions, d_masks)
                 
-            print('\n\n:: {}.train {}'.format(j + 1, self.metrics.report()))
-
-            train_metrics = self.evaluate(data.iter_all('train'))
+            train_data = data.iter_all('train')
+            train_metrics = self.evaluate(train_data)
             print(':: {}.train {}'.format(j + 1, train_metrics.report()))
             valid_metrics = self.evaluate(eval_data)
             print(':: {}.valid {}'.format(j + 1, valid_metrics.report()))
@@ -310,12 +282,6 @@ class GoalOrientedBot(Inferable, Trainable):
         self.db_result = None
         self.prev_action = np.zeros(self.n_actions, dtype=np.float32)
         self.network.reset_state()
-
-    def report(self):
-        return self.metrics.report()
-
-    def reset_metrics(self):
-        self.metrics.reset()
 
     def save(self):
         """Save the parameters of the model to a file."""
