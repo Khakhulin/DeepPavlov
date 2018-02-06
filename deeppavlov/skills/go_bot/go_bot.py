@@ -235,12 +235,12 @@ class GoalOrientedBot(Inferable, Trainable):
             self._action_mask(),
             prob=True
         )
+        pred_id = np.argmax(probs)
         #self.prev_action = probs
         self.prev_action *= 0
         self.prev_action[pred_id] = 1
         if db_result is not None:
             self.db_result = db_result
-        pred_id = np.argmax(probs)
         return self._decode_response(pred_id)
 
     def evaluate(self, eval_data):
